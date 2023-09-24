@@ -1,15 +1,15 @@
 [package]
-name = "TileClerk"
+name = "tile_clerk"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 path = "src/lib.rs"
-name = "TileClerkLib"
+name = "tile_clerk_lib"
 
 [[bin]]
 path = "src/main.rs"
-name = "TileClerk"
+name = "tile_clerk"
 
 [dependencies]
 eframe = "0.22.0"
