@@ -92,7 +92,33 @@ impl eframe::App for MyApp {
                 let rect = egui::Rect::from_min_size(egui::pos2(1.0, 1.0), texture.size_vec2());
                 mesh.add_rect_with_uv(rect, egui::Rect::from_two_pos(egui::pos2(0.0,0.0), egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
                 painter.add(egui::Shape::mesh(mesh));
-                painter.add(egui::Shape::line(line_1, stroke_style));
+
+                // Add grid
+                if self.tileset_info.columns.is_empty() || self.tileset_info.rows.is_empty() || self.tileset_info.width_px.is_empty() || self.tileset_info.height_px.is_empty() {
+                    // Skip
+                }
+                else {
+                    for column in 0..(self.tileset_info.columns.parse::<i32>().unwrap() + 1) {
+                        let x: f32 = self.tileset_info.width_px.parse::<i32>().unwrap() as f32 * column as f32;
+                        let y1: f32 = 0.0;
+                        let y2: f32 = self.tileset_info.height_px.parse::<i32>().unwrap() as f32 * self.tileset_info.rows.parse::<i32>().unwrap() as f32;
+
+                        let mut line_1: Vec<egui::Pos2> = Vec::new();
+                        line_1.push(egui::pos2(x, y1));
+                        line_1.push(egui::pos2(x, y2));
+                        painter.add(egui::Shape::line(line_1, stroke_style));
+                    }
+                    for row in 0..(self.tileset_info.rows.parse::<i32>().unwrap() + 1) {
+                        let y: f32 = self.tileset_info.height_px.parse::<i32>().unwrap() as f32 * row as f32;
+                        let x1: f32 = 0.0;
+                        let x2: f32 = self.tileset_info.width_px.parse::<i32>().unwrap() as f32 * self.tileset_info.columns.parse::<i32>().unwrap() as f32;
+
+                        let mut line_1: Vec<egui::Pos2> = Vec::new();
+                        line_1.push(egui::pos2(x1, y));
+                        line_1.push(egui::pos2(x2, y));
+                        painter.add(egui::Shape::line(line_1, stroke_style));
+                    }
+                }
                 //painter.extend(shapes);
             });
 
