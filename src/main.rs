@@ -13,15 +13,23 @@ struct TilesetInformation
     height_px: String,
 }
 
+#[derive(Debug)]
+struct TilePosition {
+    x: i32,
+    y: i32,
+}
+
 struct MyApp {
     // Tileset image
     image: RetainedImage,
 
     texture: Option<egui::TextureHandle>,
 
-
     // Lateral menu
     tileset_info: TilesetInformation,
+
+    // Current selected tile
+    selected_tile: TilePosition,
 }
 
 
@@ -39,7 +47,7 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
 impl MyApp {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>, image: RetainedImage) -> Self {
-        MyApp { image: image, tileset_info: TilesetInformation::default(), texture: None}
+        MyApp { image, tileset_info: TilesetInformation::default(), texture: None, selected_tile: TilePosition {x: 0, y: 0}}
     }
 
     fn update_sidebar(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -60,11 +68,9 @@ impl MyApp {
             if ui.button("Done!").clicked() {
                 println!("{}", "Button clicked")
             }
-
         });
     }
 }
-
 
 
 impl eframe::App for MyApp {
@@ -73,11 +79,9 @@ impl eframe::App for MyApp {
 
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
                 let painter = ui.painter();
+                let canvas_rect = ui.max_rect();
+
                 let stroke_style = egui::Stroke { width: 2.0, color: egui::Color32::WHITE };
-                let mut lines: Vec<Vec<egui::Pos2>> = Vec::new();
-                let mut line_1: Vec<egui::Pos2> = Vec::new();
-                line_1.push(egui::pos2(0.0, 0.0));
-                line_1.push(egui::pos2(0.0, 64.0));
 
                 let texture: &egui::TextureHandle = &self.texture.get_or_insert_with(|| {
                     // Load the texture only once.
@@ -118,14 +122,30 @@ impl eframe::App for MyApp {
                         line_1.push(egui::pos2(x2, y));
                         painter.add(egui::Shape::line(line_1, stroke_style));
                     }
+
+
+                    // Ref: https://github.com/emilk/egui/pull/1396/files
+                    let canvas_response = ui.interact(canvas_rect, egui::Id::new("canvas"), egui::Sense::drag());
+
+                    // Ref: https://github.com/emilk/egui/blob/fdd493d48fd23047480ac5a0219fc5f206eb0dd3/crates/egui_demo_lib/src/demo/painting.rs#L48
+                    if let Some(pointer_pos) = canvas_response.interact_pointer_pos() {
+                        self.selected_tile = TilePosition {
+                            x: pointer_pos.x as i32 / self.tileset_info.width_px.parse::<i32>().unwrap(),
+                            y: pointer_pos.y as i32 / self.tileset_info.height_px.parse::<i32>().unwrap(),
+                        };
+                        println!("{:?}", pointer_pos);
+                        println!("-> {:?}", self.selected_tile);
+                    }
+
+                    // Print rectangle in selected position
+                    let rect = egui::Rect {
+                        min: egui::Pos2 {x: self.selected_tile.x as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: self.selected_tile.y as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
+                        max: egui::Pos2 {x: (self.selected_tile.x + 1) as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: (self.selected_tile.y + 1) as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
+                    };
+                    painter.rect_filled(rect, 0.0, egui::Color32::from_rgba_premultiplied(0, 0, 255, 80)); 
                 }
-                //painter.extend(shapes);
             });
 
-            //egui::ScrollArea::new([true, true]).show(ui, |ui| {
-            //    self.image.show(ui);
-            //    //ui.image(egui::include_image!("tileset.png"));
-            //});
         });
         self.update_sidebar(ctx, frame);
     }
@@ -152,20 +172,3 @@ fn main() -> Result<(), eframe::Error> {
         }),
     )
 }
-
-
-
-//impl eframe::App for MyApp {
-//    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-//        egui::CentralPanel::default().show(ctx, |ui| {
-//            egui::ScrollArea::new([true, true]).show(ui, |ui| {
-//                ui.image(egui::include_image!("tileset.png"));
-//
-//                ui.add(
-//                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024")
-//                        .rounding(egui::Rounding::same(10.0)),
-//                );
-//            });
-//        });
-//    }
-//}
