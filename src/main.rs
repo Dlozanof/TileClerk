@@ -19,17 +19,23 @@ struct TilePosition {
     y: i32,
 }
 
+struct CentralPanel {
+    // Loaded image
+    texture: Option<egui::TextureHandle>,
+
+    // Current selected tile
+    selected_tile: TilePosition,
+}
+
 struct MyApp {
     // Tileset image
     image: RetainedImage,
 
-    texture: Option<egui::TextureHandle>,
-
     // Lateral menu
     tileset_info: TilesetInformation,
 
-    // Current selected tile
-    selected_tile: TilePosition,
+    // Central panel
+    central_panel: CentralPanel,
 }
 
 
@@ -47,7 +53,13 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
 impl MyApp {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>, image: RetainedImage) -> Self {
-        MyApp { image, tileset_info: TilesetInformation::default(), texture: None, selected_tile: TilePosition {x: 0, y: 0}}
+        MyApp {
+            image,
+            tileset_info: TilesetInformation::default(),
+            central_panel: CentralPanel {
+                texture: None,
+                selected_tile: TilePosition {x: 0, y: 0}}
+            }            
     }
 
     fn update_sidebar(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -70,20 +82,16 @@ impl MyApp {
             }
         });
     }
-}
 
+    fn update_central_panel(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
                 let painter = ui.painter();
                 let canvas_rect = ui.max_rect();
 
-                let stroke_style = egui::Stroke { width: 2.0, color: egui::Color32::WHITE };
-
-                let texture: &egui::TextureHandle = &self.texture.get_or_insert_with(|| {
+                // Draw tileset
+                let texture: &egui::TextureHandle = &self.central_panel.texture.get_or_insert_with(|| {
                     // Load the texture only once.
                     ui.ctx().load_texture(
                         "tileset",
@@ -98,10 +106,11 @@ impl eframe::App for MyApp {
                 painter.add(egui::Shape::mesh(mesh));
 
                 // Add grid
-                if self.tileset_info.columns.is_empty() || self.tileset_info.rows.is_empty() || self.tileset_info.width_px.is_empty() || self.tileset_info.height_px.is_empty() {
-                    // Skip
-                }
-                else {
+                if !(self.tileset_info.columns.is_empty() || self.tileset_info.rows.is_empty() || self.tileset_info.width_px.is_empty() || self.tileset_info.height_px.is_empty()) {
+                    // Line information
+                    let stroke_style = egui::Stroke { width: 2.0, color: egui::Color32::WHITE };
+
+                    // Draw vertical lines
                     for column in 0..(self.tileset_info.columns.parse::<i32>().unwrap() + 1) {
                         let x: f32 = self.tileset_info.width_px.parse::<i32>().unwrap() as f32 * column as f32;
                         let y1: f32 = 0.0;
@@ -112,6 +121,8 @@ impl eframe::App for MyApp {
                         line_1.push(egui::pos2(x, y2));
                         painter.add(egui::Shape::line(line_1, stroke_style));
                     }
+
+                    // Draw horizontal lines
                     for row in 0..(self.tileset_info.rows.parse::<i32>().unwrap() + 1) {
                         let y: f32 = self.tileset_info.height_px.parse::<i32>().unwrap() as f32 * row as f32;
                         let x1: f32 = 0.0;
@@ -123,30 +134,37 @@ impl eframe::App for MyApp {
                         painter.add(egui::Shape::line(line_1, stroke_style));
                     }
 
-
+                    // Draw selected tile blue square
                     // Ref: https://github.com/emilk/egui/pull/1396/files
                     let canvas_response = ui.interact(canvas_rect, egui::Id::new("canvas"), egui::Sense::drag());
 
                     // Ref: https://github.com/emilk/egui/blob/fdd493d48fd23047480ac5a0219fc5f206eb0dd3/crates/egui_demo_lib/src/demo/painting.rs#L48
                     if let Some(pointer_pos) = canvas_response.interact_pointer_pos() {
-                        self.selected_tile = TilePosition {
+                        let clicked_position = TilePosition {
                             x: pointer_pos.x as i32 / self.tileset_info.width_px.parse::<i32>().unwrap(),
                             y: pointer_pos.y as i32 / self.tileset_info.height_px.parse::<i32>().unwrap(),
-                        };
-                        println!("{:?}", pointer_pos);
-                        println!("-> {:?}", self.selected_tile);
+                        }; // TODO: THIS IS BROKEN
+                        if (clicked_position.x <= self.tileset_info.columns.parse::<i32>().unwrap()) || 
+                            (clicked_position.y <= self.tileset_info.rows.parse::<i32>().unwrap()) {
+                            self.central_panel.selected_tile = clicked_position;
+                        }
                     }
 
-                    // Print rectangle in selected position
                     let rect = egui::Rect {
-                        min: egui::Pos2 {x: self.selected_tile.x as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: self.selected_tile.y as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
-                        max: egui::Pos2 {x: (self.selected_tile.x + 1) as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: (self.selected_tile.y + 1) as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
+                        min: egui::Pos2 {x: self.central_panel.selected_tile.x as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: self.central_panel.selected_tile.y as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
+                        max: egui::Pos2 {x: (self.central_panel.selected_tile.x + 1) as f32 * self.tileset_info.width_px.parse::<f32>().unwrap(), y: (self.central_panel.selected_tile.y + 1) as f32 * self.tileset_info.height_px.parse::<f32>().unwrap() },
                     };
                     painter.rect_filled(rect, 0.0, egui::Color32::from_rgba_premultiplied(0, 0, 255, 80)); 
                 }
             });
-
         });
+    }
+}
+
+
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.update_central_panel(ctx, frame);
         self.update_sidebar(ctx, frame);
     }
 
