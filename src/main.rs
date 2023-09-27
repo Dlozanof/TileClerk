@@ -53,6 +53,21 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
     ))
 }
 
+// This macro creates a `label [field   ]` structure by providing the label contents
+// and where to store them in the app state. Macro benefit is that it allows to use
+// a reference in the second parameter, while a function does not because is already
+// taken by `self`.
+macro_rules! flabel {
+    ($ui: expr, $label_content: expr, $data_storage: expr) => {
+        {
+            $ui.horizontal(|ui| {
+                let _response = ui.add(egui::Label::new($label_content));
+                let _response = ui.add(egui::TextEdit::singleline($data_storage));
+            });
+        }
+    };
+}
+
 impl MyApp {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>, image: RetainedImage) -> Self {
@@ -70,17 +85,10 @@ impl MyApp {
         egui::SidePanel::right("side_panel").show(ctx, |ui| {
 
             // Show tileset information
-            let _response = ui.add(egui::Label::new("Rows"));
-            let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.rows));
-            
-            let _response = ui.add(egui::Label::new("Columns"));
-            let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.columns));
-
-            let _response = ui.add(egui::Label::new("Tile width"));
-            let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.width_px));
-
-            let _response = ui.add(egui::Label::new("Tile height"));
-            let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.height_px));
+            flabel!(ui, "Rows", &mut self.tileset_info.rows);
+            flabel!(ui, "Columns", &mut self.tileset_info.columns);
+            flabel!(ui, "Tile width", &mut self.tileset_info.width_px);
+            flabel!(ui, "Tile height", &mut self.tileset_info.height_px);
 
             // Show selected tile information
             ui.add(egui::Separator::default());
