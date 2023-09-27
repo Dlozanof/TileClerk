@@ -1,26 +1,8 @@
 use eframe::egui;
-use serde::{Deserialize, Serialize};
 use egui_extras::image::RetainedImage;
 use std::{fs::File, io::Read};
 use std::io::prelude::*;
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct TileMetadata {
-    name: String,
-    x: i32,
-    y: i32,
-}
-
-#[derive(Default, Serialize, Deserialize)]
-struct TilesetInformation
-{
-    rows: String,
-    columns: String,
-    width_px: String,
-    height_px: String,
-    tiles: Vec<TileMetadata>,
-}
+use tile_clerk_lib::*;
 
 struct CentralPanel {
     // Loaded image
@@ -28,6 +10,9 @@ struct CentralPanel {
 
     // Current selected tile
     selected_tile: TileMetadata,
+
+    // Selected path for PNG image
+    image_path: Option<String>,
 }
 
 struct MyApp {
@@ -77,9 +62,30 @@ impl MyApp {
             central_panel: CentralPanel {
                 texture: None,
                 selected_tile: TileMetadata {name: String::new(), x: 0, y: 0},
+                image_path: None, 
             }
         }
     }
+
+    fn update_bottom_bar(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+
+            // Load PNG
+            ui.horizontal(|ui| {
+                if ui.button("Load image").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                        self.central_panel.image_path = Some(path.display().to_string());
+                    }
+                }
+
+                if let Some(picked_path) = &self.central_panel.image_path {
+                        ui.label("Picked file:");
+                        ui.monospace(picked_path);
+                }
+            });
+        });
+    }
+
 
     fn update_sidebar(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::SidePanel::right("side_panel").show(ctx, |ui| {
@@ -94,8 +100,7 @@ impl MyApp {
             ui.add(egui::Separator::default());
             let _response = ui.add(egui::Label::new(format!("Columnn: {}", self.central_panel.selected_tile.x)));
             let _response = ui.add(egui::Label::new(format!("Row: {}", self.central_panel.selected_tile.y)));
-            let _response = ui.add(egui::Label::new("Tile name"));
-            let _response = ui.add(egui::TextEdit::singleline(&mut self.central_panel.selected_tile.name));
+            flabel!(ui, "Tile name", &mut self.central_panel.selected_tile.name);
     
             // Button to save tile information
             if ui.button("Save tile information").clicked() {
@@ -121,24 +126,28 @@ impl MyApp {
 
     fn update_central_panel(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+
+
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
                 let painter = ui.painter();
                 let canvas_rect = ui.max_rect();
 
                 // Draw tileset
-                let texture: &egui::TextureHandle = &self.central_panel.texture.get_or_insert_with(|| {
-                    // Load the texture only once.
-                    ui.ctx().load_texture(
-                        "tileset",
-                        load_image_from_path(std::path::Path::new("tileset.png")).expect("bad"),
-                        Default::default()
-                    )
-                });
+                if let Some(path) = &self.central_panel.image_path {
+                    let texture: &egui::TextureHandle = &self.central_panel.texture.get_or_insert_with(|| {
+                        // Load the texture only once.
+                        ui.ctx().load_texture(
+                            "tileset",
+                            load_image_from_path(std::path::Path::new(&path)).expect("bad"),
+                            Default::default()
+                        )
+                    });
 
-                let mut mesh = egui::Mesh::with_texture(texture.id());
-                let rect = egui::Rect::from_min_size(egui::pos2(1.0, 1.0), texture.size_vec2());
-                mesh.add_rect_with_uv(rect, egui::Rect::from_two_pos(egui::pos2(0.0,0.0), egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
-                painter.add(egui::Shape::mesh(mesh));
+                    let mut mesh = egui::Mesh::with_texture(texture.id());
+                    let rect = egui::Rect::from_min_size(egui::pos2(1.0, 1.0), texture.size_vec2());
+                    mesh.add_rect_with_uv(rect, egui::Rect::from_two_pos(egui::pos2(0.0,0.0), egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
+                    painter.add(egui::Shape::mesh(mesh));
+                }
 
                 // Add grid
                 if !(self.tileset_info.columns.is_empty() || self.tileset_info.rows.is_empty() || self.tileset_info.width_px.is_empty() || self.tileset_info.height_px.is_empty()) {
@@ -203,6 +212,7 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.update_central_panel(ctx, frame);
         self.update_sidebar(ctx, frame);
+        self.update_bottom_bar(ctx, frame);
     }
 
 }
