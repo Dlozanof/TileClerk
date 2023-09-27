@@ -1,22 +1,25 @@
 use eframe::egui;
-use egui::Vec2;
+use serde::{Deserialize, Serialize};
 use egui_extras::image::RetainedImage;
 use std::{fs::File, io::Read};
+use std::io::prelude::*;
 
 
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TileMetadata {
+    name: String,
+    x: i32,
+    y: i32,
+}
+
+#[derive(Default, Serialize, Deserialize)]
 struct TilesetInformation
 {
     rows: String,
     columns: String,
     width_px: String,
     height_px: String,
-}
-
-#[derive(Debug)]
-struct TilePosition {
-    x: i32,
-    y: i32,
+    tiles: Vec<TileMetadata>,
 }
 
 struct CentralPanel {
@@ -24,7 +27,7 @@ struct CentralPanel {
     texture: Option<egui::TextureHandle>,
 
     // Current selected tile
-    selected_tile: TilePosition,
+    selected_tile: TileMetadata,
 }
 
 struct MyApp {
@@ -58,13 +61,15 @@ impl MyApp {
             tileset_info: TilesetInformation::default(),
             central_panel: CentralPanel {
                 texture: None,
-                selected_tile: TilePosition {x: 0, y: 0}}
-            }            
+                selected_tile: TileMetadata {name: String::new(), x: 0, y: 0},
+            }
+        }
     }
 
     fn update_sidebar(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::SidePanel::right("side_panel").show(ctx, |ui| {
 
+            // Show tileset information
             let _response = ui.add(egui::Label::new("Rows"));
             let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.rows));
             
@@ -76,15 +81,37 @@ impl MyApp {
 
             let _response = ui.add(egui::Label::new("Tile height"));
             let _response = ui.add(egui::TextEdit::singleline(&mut self.tileset_info.height_px));
+
+            // Show selected tile information
+            ui.add(egui::Separator::default());
+            let _response = ui.add(egui::Label::new(format!("Columnn: {}", self.central_panel.selected_tile.x)));
+            let _response = ui.add(egui::Label::new(format!("Row: {}", self.central_panel.selected_tile.y)));
+            let _response = ui.add(egui::Label::new("Tile name"));
+            let _response = ui.add(egui::TextEdit::singleline(&mut self.central_panel.selected_tile.name));
     
-            if ui.button("Done!").clicked() {
-                println!("{}", "Button clicked")
+            // Button to save tile information
+            if ui.button("Save tile information").clicked() {
+                println!("{}", "Button clicked");
+                self.tileset_info.tiles.push(self.central_panel.selected_tile.clone());
             }
+
+            // List of tile data
+            ui.add(egui::Separator::default());
+            for tile in &self.tileset_info.tiles {
+                let _response = ui.add(egui::Label::new(format!("{:?}", tile)));
+            }
+
+            // Button to save tileset to a file
+            if ui.button("Export .pkg file").clicked() {
+                let export_string = serde_json::to_string(&self.tileset_info).expect("bad");
+                let mut file = File::create("outout.json").expect("bad");
+                file.write_all(format!("{}", export_string).as_bytes()).expect("bad");
+            }
+
         });
     }
 
     fn update_central_panel(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
                 let painter = ui.painter();
@@ -140,13 +167,15 @@ impl MyApp {
 
                     // Ref: https://github.com/emilk/egui/blob/fdd493d48fd23047480ac5a0219fc5f206eb0dd3/crates/egui_demo_lib/src/demo/painting.rs#L48
                     if let Some(pointer_pos) = canvas_response.interact_pointer_pos() {
-                        let clicked_position = TilePosition {
+                        let clicked_position = TileMetadata {
+                            name: String::new(),
                             x: pointer_pos.x as i32 / self.tileset_info.width_px.parse::<i32>().unwrap(),
                             y: pointer_pos.y as i32 / self.tileset_info.height_px.parse::<i32>().unwrap(),
-                        }; // TODO: THIS IS BROKEN
-                        if (clicked_position.x <= self.tileset_info.columns.parse::<i32>().unwrap()) || 
-                            (clicked_position.y <= self.tileset_info.rows.parse::<i32>().unwrap()) {
+                        };
+                        if (clicked_position.x < self.tileset_info.columns.parse::<i32>().unwrap()) && 
+                            (clicked_position.y < self.tileset_info.rows.parse::<i32>().unwrap()) {
                             self.central_panel.selected_tile = clicked_position;
+                            println!("{:?}", self.central_panel.selected_tile);
                         }
                     }
 
