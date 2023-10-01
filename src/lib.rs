@@ -1,4 +1,4 @@
-
+use base64_serde::base64_serde_type;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8,6 +8,8 @@ pub struct TileMetadata {
     pub y: i32,
 }
 
+base64_serde_type!(Base64Standard, base64::engine::general_purpose::STANDARD);
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct TilesetInformation
 {
@@ -16,5 +18,8 @@ pub struct TilesetInformation
     pub width_px: String,
     pub height_px: String,
     pub tiles: Vec<TileMetadata>,
+    pub image_path: String,
+    #[serde(with = "Base64Standard")]
+    pub image_raw: Vec<u8>,
 }
 

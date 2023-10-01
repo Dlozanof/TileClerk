@@ -10,9 +10,6 @@ struct CentralPanel {
 
     // Current selected tile
     selected_tile: TileMetadata,
-
-    // Selected path for PNG image
-    image_path: Option<String>,
 }
 
 struct MyApp {
@@ -62,7 +59,6 @@ impl MyApp {
             central_panel: CentralPanel {
                 texture: None,
                 selected_tile: TileMetadata {name: String::new(), x: 0, y: 0},
-                image_path: None, 
             }
         }
     }
@@ -74,13 +70,14 @@ impl MyApp {
             ui.horizontal(|ui| {
                 if ui.button("Load image").clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
-                        self.central_panel.image_path = Some(path.display().to_string());
+                        self.tileset_info.image_path = path.display().to_string();
+                        File::open(&self.tileset_info.image_path).expect("bad").read_to_end(&mut self.tileset_info.image_raw).expect("Bad");
                     }
                 }
 
-                if let Some(picked_path) = &self.central_panel.image_path {
+                if !self.tileset_info.image_path.is_empty() {
                         ui.label("Picked file:");
-                        ui.monospace(picked_path);
+                        ui.monospace(&self.tileset_info.image_path);
                 }
             });
         });
@@ -108,17 +105,19 @@ impl MyApp {
                 self.tileset_info.tiles.push(self.central_panel.selected_tile.clone());
             }
 
+            // Button to save tileset to a file
+            if ui.button("Export asset").clicked() {
+                if let Some(path) = rfd::FileDialog::new().save_file() {
+                    let export_string = serde_json::to_string(&self.tileset_info).expect("bad");
+                    let mut file = File::create(path).expect("bad");
+                    file.write_all(format!("{}", export_string).as_bytes()).expect("bad");
+                }
+            }
+
             // List of tile data
             ui.add(egui::Separator::default());
             for tile in &self.tileset_info.tiles {
                 let _response = ui.add(egui::Label::new(format!("{:?}", tile)));
-            }
-
-            // Button to save tileset to a file
-            if ui.button("Export .pkg file").clicked() {
-                let export_string = serde_json::to_string(&self.tileset_info).expect("bad");
-                let mut file = File::create("outout.json").expect("bad");
-                file.write_all(format!("{}", export_string).as_bytes()).expect("bad");
             }
 
         });
@@ -133,12 +132,12 @@ impl MyApp {
                 let canvas_rect = ui.max_rect();
 
                 // Draw tileset
-                if let Some(path) = &self.central_panel.image_path {
+                if !self.tileset_info.image_path.is_empty() {
                     let texture: &egui::TextureHandle = &self.central_panel.texture.get_or_insert_with(|| {
                         // Load the texture only once.
                         ui.ctx().load_texture(
                             "tileset",
-                            load_image_from_path(std::path::Path::new(&path)).expect("bad"),
+                            load_image_from_path(std::path::Path::new(&self.tileset_info.image_path)).expect("bad"),
                             Default::default()
                         )
                     });
@@ -224,7 +223,7 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
-    let mut buffer = vec![];    
+    let mut buffer = vec![];
     File::open ("tileset.png").expect("bad").read_to_end(&mut buffer).expect("Bad");
     let img = RetainedImage::from_image_bytes ("tileset.png", &buffer[..]).expect("bad");
 
